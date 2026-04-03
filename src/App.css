@@ -1,0 +1,225 @@
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
+
+@import url('https://fonts.googleapis.com/css2?family=Righteous&display=swap');
+
+:root {
+  --green-primary: #03C75A;
+  --green-dark: #03c75a;
+  --green-light:   #ADFFD2;
+  --green-pale:    #F0FFF7;
+
+  --gray-50:  #F8F9FA;
+  --gray-100: #F1F3F5;
+  --gray-200: #E9ECEF;
+  --gray-300: #DEE2E6;
+  --gray-400: #ADB5BD;
+  --gray-500: #868E96;
+  --gray-600: #495057;
+  --gray-900: #212529;
+
+  --white: #FFFFFF;
+
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-full: 999px;
+
+  --font: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--gray-100);
+  font-family: var(--font);
+  color: var(--gray-900);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── 공통 스크린 컨테이너 ── */
+.screen {
+  max-width: 390px;  /* 아이폰 기준 */
+  width: 100%;
+  min-height: 100vh;
+  margin: 0 auto;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: hidden;    /* 추가 */
+}
+
+.screen-body {
+  flex: 1;
+  padding: 0 24px;
+  padding-bottom: 120px;
+  overflow-y: auto;
+}
+
+/* ── 하단 고정 버튼 ── */
+.bottom-bar {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 24px 36px;
+  background: var(--white);
+  border-top: 1px solid var(--gray-100);
+}
+
+/* ── 버튼 ── */
+.btn {
+  width: 100%;
+  padding: 17px;
+  border-radius: var(--radius-full);
+  border: none;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn:active { transform: scale(0.98); }
+
+.btn-primary {
+  background: var(--green-primary);
+  color: var(--white);
+}
+
+.btn-primary:hover { background: var(--green-dark); }
+
+.btn-primary:disabled {
+  background: var(--gray-300);
+  color: var(--gray-400);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+.btn-secondary:hover { background: var(--gray-200); }
+
+.btn-social {
+  background: var(--white);
+  color: var(--gray-900);
+  border: 1.5px solid var(--gray-200);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.btn-social:hover { background: var(--gray-50); }
+
+/* ── 인풋 ── */
+.input-field {
+  width: 100%;
+  padding: 15px 16px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--gray-200);
+  background: var(--gray-50);
+  font-size: 15px;
+  font-family: var(--font);
+  color: var(--gray-900);
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 10px;
+}
+
+.input-field::placeholder { color: var(--gray-400); }
+
+.input-field:focus {
+  border-color: var(--green-primary);
+  background: var(--white);
+}
+
+/* ── 칩/태그 ── */
+.chip {
+  padding: 9px 16px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--gray-200);
+  background: var(--white);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font);
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.chip:active { transform: scale(0.96); }
+
+.chip.active {
+  background: var(--green-primary);
+  border-color: var(--green-primary);
+  color: var(--white);
+  font-weight: 600;
+}
+
+/* ── 구분선 ── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--gray-200);
+}
+
+.divider span {
+  font-size: 13px;
+  color: var(--gray-400);
+}
+
+/* ── 프로그레스 바 ── */
+.progress-bar-wrap {
+  display: flex;
+  gap: 4px;
+  padding: 14px 24px 0;
+}
+
+.progress-segment {
+  flex: 1;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--gray-200);
+  transition: background 0.3s;
+}
+
+.progress-segment.done {
+  background: var(--green-primary);
+}
+
+/* ── 뒤로가기 버튼 ── */
+.back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 16px 24px 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gray-600);
+  font-size: 14px;
+  font-family: var(--font);
+  width: auto;
+}
+
+.back-btn:hover { color: var(--gray-900); }
+.back-btn:active { transform: none; }

@@ -1,0 +1,107 @@
+/* ── Profile 전용 스타일 ── */
+
+.profile-step {
+  animation: fadeUp 0.25s ease both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.step-header {
+  margin-bottom: 28px;
+}
+
+.step-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1.3;
+  color: var(--gray-900);
+  margin-bottom: 6px;
+}
+
+.step-sub {
+  font-size: 14px;
+  color: var(--gray-400);
+  line-height: 1.5;
+}
+
+/* ── 성별 선택 버튼 ── */
+.gender-option {
+  width: 100%;
+  padding: 17px 20px;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--gray-200);
+  background: var(--white);
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--font);
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.gender-option:hover {
+  border-color: var(--green-primary);
+  background: var(--green-pale, #F0FFF7);
+}
+
+.gender-option.active {
+  border-color: var(--green-primary);
+  background: var(--green-pale, #F0FFF7);
+  color: var(--green-dark);
+}
+
+.gender-option:active {
+  transform: scale(0.98);
+}
+
+/* ── 이모지 그리드 ── */
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.emoji-item {
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--gray-200);
+  background: var(--white);
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+
+.emoji-item:hover {
+  border-color: var(--green-primary);
+  background: var(--green-pale, #F0FFF7);
+  transform: scale(1.05);
+}
+
+.emoji-item.active {
+  border-color: var(--green-primary);
+  background: var(--green-pale, #F0FFF7);
+  box-shadow: 0 0 0 2px var(--green-primary);
+}
+
+.emoji-item:active {
+  transform: scale(0.94);
+}
