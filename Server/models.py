@@ -45,8 +45,14 @@ class Record(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    content = Column(String)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # 필드 분리 ── ✨
+    mission_name = Column(String)     # 예: "플로깅 하기"
+    proof_content = Column(String)    # 예: "오늘 공원에서 쓰레기 3봉지 주웠어요!"
+    
+    created_at = Column(DateTime, default=func.now())
+
+    user = relationship("User", back_populates="records")
 
 
 class Activity(Base):
