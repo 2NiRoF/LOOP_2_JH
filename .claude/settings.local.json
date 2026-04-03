@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl -s http://127.0.0.1:8000/)"
+      "Bash(curl -s http://127.0.0.1:8000/)",
+      "Bash(cp \"c:/Users/User/Desktop/Records/Home.js\" \"c:/Users/User/Documents/GitHub/LOOP_2_JH/src/pages/Main.jsx\")",
+      "Bash(cp \"c:/Users/User/Desktop/Records/Matching.js\" \"c:/Users/User/Documents/GitHub/LOOP_2_JH/src/pages/Matching.jsx\")",
+      "Bash(cp \"c:/Users/User/Desktop/Records/MatchingRoom.js\" \"c:/Users/User/Documents/GitHub/LOOP_2_JH/src/pages/MatchingRoom.jsx\")",
+      "Bash(cp \"c:/Users/User/Desktop/Records/Records.js\" \"c:/Users/User/Documents/GitHub/LOOP_2_JH/src/pages/Records.jsx\")",
+      "Bash(cp \"c:/Users/User/Desktop/Records/MyPage.js\" \"c:/Users/User/Documents/GitHub/LOOP_2_JH/src/pages/MyPage.jsx\")",
+      "Bash(node -e \"const s = require\\('./node_modules/@emotion/styled'\\); console.log\\(Object.keys\\(s\\)\\)\")",
+      "Bash(node -e \"import\\('./node_modules/@emotion/styled/dist/emotion-styled.cjs.dev.js'\\).then\\(m => console.log\\(Object.keys\\(m\\)\\)\\)\")"
     ]
   }
 }
