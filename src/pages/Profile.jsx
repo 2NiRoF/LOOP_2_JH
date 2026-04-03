@@ -85,6 +85,7 @@ export default function Profile() {
         return;
       }
 
+      localStorage.setItem("user_id", user_id);
       navigate("/home");
 
     } catch (err) {

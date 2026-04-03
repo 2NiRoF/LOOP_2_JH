@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import MatchingRoom from './MatchingRoom';
 import styled from '@emotion/styled';
 import { keyframes as kf } from '@emotion/react';
+
+const API = 'http://127.0.0.1:8000';
 
 /* ─── 활동별 SVG 아이콘 ─── */
 const ICONS = {
@@ -53,15 +55,18 @@ const ICONS = {
     ),
 };
 
-/* ─── 임시 데이터 (참여 인원 2~4명) ─── */
 const ACTIVITY_TYPES = ['전체', '텀블러', '쓰레기 줍기', '분리수거', '플로깅', '해안 정화'];
-const MOCK_CHALLENGES = [
-    { id: 1, name: '텀블러 사용하기', desc: '텀블러를 사용해 플라스틱 줄이기', type: '텀블러', icon: ICONS.tumbler },
-    { id: 2, name: '쓰레기 줍기', desc: '근처 공원에서 쓰레기 줍기', type: '쓰레기 줍기', icon: ICONS.trash },
-    { id: 3, name: '분리수거', desc: '가정에서 쓰레기 분리수거 실천', type: '분리수거', icon: ICONS.recycle },
-    { id: 4, name: '플로깅', desc: '달리면서 쓰레기 줍기', type: '플로깅', icon: ICONS.plogging },
-    { id: 5, name: '해안 정화', desc: '해변에서 쓰레기 줍기', type: '해안 정화', icon: ICONS.ocean }
-];
+
+const getIcon = (type) => {
+    const map = {
+        '텀블러': ICONS.tumbler,
+        '쓰레기 줍기': ICONS.trash,
+        '분리수거': ICONS.recycle,
+        '플로깅': ICONS.plogging,
+        '해안 정화': ICONS.ocean,
+    };
+    return map[type] || ICONS.trash;
+};
 
 /* ─── 애니메이션 ─── */
 const pulseRing = kf`
@@ -173,15 +178,15 @@ const ActivityInfo = styled.div`
 
 const JoinBtn = styled.button`
   flex-shrink: 0;
-  background: ${p => p.joined ? 'var(--color-border)' : 'var(--color-primary)'};
-  color: ${p => p.joined ? 'var(--color-text-secondary)' : 'white'};
+  background: var(--color-primary);
+  color: white;
   border: none;
   border-radius: var(--radius-sm);
   padding: 10px 18px;
   font-family: var(--font);
   font-size: 14px;
   font-weight: 800;
-  cursor: ${p => p.joined ? 'default' : 'pointer'};
+  cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
 `;
@@ -294,173 +299,95 @@ const CancelBtn = styled.button`
 `;
 
 /* ─── 컴포넌트 ─── */
-export default function Matching({ activity, onBack, onEnd, onConfirm }) {
-    const [challenges, setChallenges] = useState(
-    MOCK_CHALLENGES.map(c => ({
-        ...c,
-        participants: []
-    }))
-);
-    const [selectedType, setSelectedType]   = useState('전체');
-    const [joinedIds, setJoinedIds]         = useState([]);
-    const [matchingItem, setMatchingItem]   = useState(null);
-    const [matchDone, setMatchDone]         = useState(false);
-    const [roomItem, setRoomItem]           = useState(null);
+export default function Matching() {
+    const [activities, setActivities]     = useState([]);
+    const [selectedType, setSelectedType] = useState('전체');
+    const [matchingItem, setMatchingItem] = useState(null);
+    const [matchDone, setMatchDone]       = useState(false);
+    const [roomId, setRoomId]             = useState(null);
+    const [roomItem, setRoomItem]         = useState(null);
+    const pollingRef = useRef(null);
 
-    const [roomStatusMap, setRoomStatusMap] = useState({});
+    const userId = Number(localStorage.getItem('user_id') || '1');
 
-    const handleCancel = () => {
-    setMatchingItem(null);
-    setMatchDone(false);
-};
+    // 활동 목록 조회
+    useEffect(() => {
+        fetch(`${API}/activities`)
+            .then(r => r.json())
+            .then(data => setActivities(data.map(a => ({ ...a, icon: getIcon(a.type) }))))
+            .catch(err => console.error('활동 목록 조회 실패:', err));
+    }, []);
 
-    const approveRecord = (recordId) => {
-    const records = JSON.parse(localStorage.getItem('records')) || [];
-    const updated = records.map(r => r.id === recordId ? {...r, status: 'approved'} : r);
-  localStorage.setItem('records', JSON.stringify(updated));
-};
-
-    const user = JSON.parse(localStorage.getItem('user')) || { name: '나', id: 0 };
-    const currentUserId = user.id;
+    // 언마운트 시 polling 정리
+    useEffect(() => () => clearInterval(pollingRef.current), []);
 
     const filtered = selectedType === '전체'
-    ? challenges
-    : challenges.filter(c => c.type === selectedType);
+        ? activities
+        : activities.filter(c => c.type === selectedType);
 
-    const handleJoin = (challenge) => {
-    const user = JSON.parse(localStorage.getItem('user')) || { id: 0, name: '나' };
+    const handleJoin = async (challenge) => {
+        try {
+            const res = await fetch(
+                `${API}/matching/join/${challenge.id}?user_id=${userId}`,
+                { method: 'POST' }
+            );
+            const data = await res.json();
+            setRoomId(data.room_id);
+            setMatchingItem(challenge);
 
-    // 1. participants 배열에 등록 (done 상태는 아직 바꾸지 않음)
-    setChallenges(prev =>
-        prev.map(c =>
-            c.id === challenge.id
-                ? { ...c, participants: [...(c.participants||[]), { id: user.id }] }
-                : c
-        )
-    );
-
-    // 2. roomItem 상태 세팅 (매칭 화면)
-    setMatchingItem(challenge);
-    setMatchDone(false);
-    setTimeout(() => setMatchDone(true), 2500);
-
-    // 3. 로컬스토리지에도 참여 기록(pending) 남기기
-    const records = JSON.parse(localStorage.getItem('records')) || [];
-    const exists = records.find(r => r.userId === user.id && r.activity === challenge.type);
-    if (!exists) {
-        records.unshift({
-            id: Date.now(),
-            userId: user.id,
-            user: user.name,
-            activity: challenge.type,
-            status: 'pending',
-        });
-        localStorage.setItem('records', JSON.stringify(records));
-    }
-};
-
-   const handleEnterRoom = () => {
-    setChallenges(prev =>
-        prev.map(c => {
-            if (c.id === matchingItem.id) {
-                return {
-                    ...c,
-                    participants: [
-                        ...c.participants,
-                        { id: currentUserId, done: false }
-                    ]
-                };
+            if (data.can_certify) {
+                setMatchDone(true);
+            } else {
+                setMatchDone(false);
+                pollingRef.current = setInterval(async () => {
+                    try {
+                        const r = await fetch(`${API}/matching/status?user_id=${userId}`);
+                        const s = await r.json();
+                        if (s.can_certify) {
+                            clearInterval(pollingRef.current);
+                            setRoomId(s.room_id);
+                            setMatchDone(true);
+                        }
+                    } catch {}
+                }, 1500);
             }
-            return c;
-        })
-    );
-
-    setRoomItem(matchingItem);
-    setMatchingItem(null);
-    setMatchDone(false);
-};
-
-    const getEmoji = (type) => {
-    switch(type) {
-        case '텀블러': return '🥤';
-        case '쓰레기 줍기': return '🗑️';
-        case '분리수거': return '♻️';
-        case '플로깅': return '🏃';
-        case '해안 정화': return '🌊';
-        default: return '✨';
+        } catch (err) {
+            console.error('매칭 참여 실패:', err);
+            alert('서버에 연결할 수 없습니다.');
         }
     };
 
- const handleConfirm = (photo, description) => {
-    // ❗ 1. roomItem 없으면 종료 (에러 방지)
-    if (!roomItem) return;
-
-    // 사용자 정보
-    const user = JSON.parse(localStorage.getItem('user')) || { name: '나', id: 0 };
-    
-    // ❗ 2. 값 미리 저장 (roomItem 사라지기 전에)
-    const activityType = roomItem.type;
-    const emoji = getEmoji(activityType);
-
-    setChallenges(prev =>
-        prev.map(c => {
-            if (c.id === roomItem.id) {
-                return {
-                    ...c,
-                    participants: c.participants.map(p =>
-                        p.id === currentUserId
-                            ? { ...p, done: true }
-                            : p
-                    )
-                };
-            }
-            return c;
-        })
-    );
-
-    // 📌 3. records 저장 (최대 8개 유지 - 오래된 것부터 자동 삭제)
-    const newRecord = {
-        id: Date.now(),
-        user: user.name,
-        userId: user.id,
-        activity: activityType,
-        location: '내 위치',
-        date: new Date().toISOString().slice(0,10),
-        point: 0,
-        status: 'pending',
-        emoji: emoji,
-        photo: photo || null,
-        description: description || ''
+    const handleCancel = async () => {
+        clearInterval(pollingRef.current);
+        try {
+            await fetch(`${API}/matching/cancel?user_id=${userId}`, { method: 'DELETE' });
+        } catch (err) {
+            console.error('매칭 취소 실패:', err);
+        }
+        setMatchingItem(null);
+        setMatchDone(false);
+        setRoomId(null);
     };
 
-    const existingRecords = JSON.parse(localStorage.getItem('records')) || [];
-    const updatedRecords = [newRecord, ...existingRecords].slice(0, 8);
-    localStorage.setItem('records', JSON.stringify(updatedRecords));
-    if (onConfirm) onConfirm(newRecord);
-    //setRoomItem(null);
-    const existingFeed = JSON.parse(localStorage.getItem('feed')) || [];
-
-    // 📌 6. 홈 강제 업데이트 (같은 탭 문제 해결)
-    window.dispatchEvent(new Event('storage'));
-};
+    const handleEnterRoom = () => {
+        clearInterval(pollingRef.current);
+        setRoomItem({ ...matchingItem, room_id: roomId });
+        setMatchingItem(null);
+        setMatchDone(false);
+    };
 
     if (roomItem) {
         return (
             <MatchingRoom
                 activity={roomItem}
                 onBack={() => setRoomItem(null)}
-                onConfirm={handleConfirm}
-                onEnd={() => {
-                    setJoinedIds(prev => prev.filter(id => id !== roomItem.id));
-                    setRoomItem(null);
-                }}
+                onEnd={() => setRoomItem(null)}
             />
         );
     }
 
     return (
         <Page>
-            {/* ── 헤더: 항상 유지 ── */}
             <TopBar>
                 <h1>환경 보호 활동 참여</h1>
                 <p>함께하면 더 큰 변화를 만들 수 있어요</p>
@@ -485,7 +412,6 @@ export default function Matching({ activity, onBack, onEnd, onConfirm }) {
 
                     {matchDone ? (
                         <JoinBtn
-                            joined={false}
                             onClick={handleEnterRoom}
                             style={{ marginTop: 36, padding: '13px 40px', animation: `${fadeSlideUp} 0.4s ease both` }}
                         >
@@ -522,39 +448,18 @@ export default function Matching({ activity, onBack, onEnd, onConfirm }) {
                                 <span>다른 유형으로 필터를 바꿔보세요</span>
                             </EmptyState>
                         ) : (
-                            
-                            filtered.map(challenge => {
-                                const user = JSON.parse(localStorage.getItem('user')) || { id: 0 };
-                                const participants = challenge.participants || [];
-
-                                const records = JSON.parse(localStorage.getItem('records')) || [];
-                                const myRecord = records.find(r => r.userId === user.id && r.activity === challenge.type);
-
-                                let buttonText = '참여하기';
-                                    if (participants.find(p => p.id === user.id)) {
-                                        if (!myRecord || myRecord.status === 'pending') buttonText = '⏳ 진행중';
-                                        else if (myRecord.status === 'approved') buttonText = '✅ 완료';
-                                    }
-
-    return (
-        <ActivityCard key={challenge.id}>
-            <IconCircle>{challenge.icon}</IconCircle>
-            <ActivityInfo>
-                <div className="name">{challenge.name}</div>
-                <div className="desc">{challenge.desc}</div>
-            </ActivityInfo>
-            <JoinBtn
-                joined={participants.find(p => p.id === user.id) != null}
-                onClick={() => {
-                    if (!participants.find(p => p.id === user.id)) handleJoin(challenge);
-                    else setRoomItem(challenge);
-                }}
-            >
-                {buttonText}
-            </JoinBtn>
-        </ActivityCard>
-    );
-})
+                            filtered.map(challenge => (
+                                <ActivityCard key={challenge.id}>
+                                    <IconCircle>{challenge.icon}</IconCircle>
+                                    <ActivityInfo>
+                                        <div className="name">{challenge.name}</div>
+                                        <div className="desc">{challenge.desc}</div>
+                                    </ActivityInfo>
+                                    <JoinBtn onClick={() => handleJoin(challenge)}>
+                                        참여하기
+                                    </JoinBtn>
+                                </ActivityCard>
+                            ))
                         )}
                     </Section>
                 </>
