@@ -310,12 +310,51 @@ export default function Matching() {
 
     const userId = Number(localStorage.getItem('user_id') || '1');
 
-    // 활동 목록 조회
+    // 활동 목록 조회 + 기존 매칭 상태 복원
     useEffect(() => {
-        fetch(`${API}/activities`)
-            .then(r => r.json())
-            .then(data => setActivities(data.map(a => ({ ...a, icon: getIcon(a.type) }))))
-            .catch(err => console.error('활동 목록 조회 실패:', err));
+        const init = async () => {
+            try {
+                const [activitiesRes, statusRes] = await Promise.all([
+                    fetch(`${API}/activities`),
+                    fetch(`${API}/matching/status?user_id=${userId}`),
+                ]);
+                const activitiesData = await activitiesRes.json();
+                const statusData = await statusRes.json();
+
+                const mapped = activitiesData.map(a => ({ ...a, icon: getIcon(a.type) }));
+                setActivities(mapped);
+
+                if (statusData.room_id) {
+                    const roomRes = await fetch(`${API}/rooms/${statusData.room_id}`);
+                    const roomData = await roomRes.json();
+                    const activity = mapped.find(a => a.id === roomData.activity_id);
+                    if (activity) {
+                        if (statusData.can_certify) {
+                            // 이미 매칭 완료 → 방으로 바로 입장
+                            setRoomItem({ ...activity, room_id: statusData.room_id });
+                        } else {
+                            // 아직 대기 중 → 매칭 대기 화면 복원 + polling 재시작
+                            setRoomId(statusData.room_id);
+                            setMatchingItem(activity);
+                            pollingRef.current = setInterval(async () => {
+                                try {
+                                    const r = await fetch(`${API}/matching/status?user_id=${userId}`);
+                                    const s = await r.json();
+                                    if (s.can_certify) {
+                                        clearInterval(pollingRef.current);
+                                        setRoomId(s.room_id);
+                                        setMatchDone(true);
+                                    }
+                                } catch {}
+                            }, 1500);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('초기화 실패:', err);
+            }
+        };
+        init();
     }, []);
 
     // 언마운트 시 polling 정리

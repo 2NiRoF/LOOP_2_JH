@@ -10,11 +10,15 @@ export default function Signup() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const goNext = async () => {
+    setError("");
     if (step < TOTAL_STEPS) {
       setStep(step + 1);
     } else {
+      setLoading(true);
       try {
         const formData = new URLSearchParams();
         formData.append("email", email);
@@ -24,26 +28,24 @@ export default function Signup() {
 
         const res = await fetch("http://127.0.0.1:8000/auth/register", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: formData.toString(),
         });
 
         if (!res.ok) {
           const err = await res.json();
-          alert(err.detail || "회원가입에 실패했습니다.");
+          setError(err.detail || "회원가입에 실패했습니다.");
           return;
         }
 
         const data = await res.json();
-        navigate("/profile", {
-          state: { email, phone, user_id: data.user_id },
-        });
+        navigate("/profile", { state: { email, phone, user_id: data.user_id } });
 
       } catch (err) {
         console.error("에러:", err);
-        alert("서버에 연결할 수 없습니다.");
+        setError("서버에 연결할 수 없습니다.");
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -152,14 +154,27 @@ export default function Signup() {
                 전화번호 또는 이메일에 한 번 등록할 경우,<br />연결된 계정으로 로그인이 가능해요.
               </div>
             </div>
+            {error && (
+              <div style={{ marginTop: 16, background: "#FFEBEE", color: "#B71C1C", borderRadius: 10, padding: "12px 14px", fontSize: 13, fontWeight: 700 }}>
+                {error}
+                {error.includes("이미 사용") && (
+                  <button
+                    onClick={() => navigate("/")}
+                    style={{ display: "block", marginTop: 8, background: "none", border: "none", color: "#B71C1C", fontWeight: 800, fontSize: 13, cursor: "pointer", textDecoration: "underline", padding: 0, fontFamily: "inherit" }}
+                  >
+                    로그인 하러 가기 →
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* 하단 버튼 */}
       <div className="bottom-bar">
-        <button className="btn btn-primary" onClick={goNext} disabled={!canNext()}>
-          {step < TOTAL_STEPS ? "다음" : "시작하기"}
+        <button className="btn btn-primary" onClick={goNext} disabled={!canNext() || loading}>
+          {loading ? "처리 중..." : step < TOTAL_STEPS ? "다음" : "시작하기"}
         </button>
       </div>
     </div>

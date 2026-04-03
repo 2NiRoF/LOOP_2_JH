@@ -1,14 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
 import { useNavigate } from 'react-router-dom';
 
-/* ─── 임시 데이터 (추후 API 연동) ─── */
-const MOCK_USER = { name: '김에코', point: 1240, streak: 7 };
-const MOCK_FEED = [
-  { id: 1, user: '이지구', activity: '쓰레기 줍기', location: '한강공원', time: '10분 전', emoji: '🗑️', likes: 12 },
-  { id: 2, user: '박초록', activity: '분리수거',   location: '마포구 홍대',  time: '32분 전', emoji: '♻️', likes: 8  },
-  { id: 3, user: '최자연', activity: '쓰레기 줍기', location: '북한산',      time: '1시간 전', emoji: '🌿', likes: 21 },
-];
+const API = 'http://127.0.0.1:8000';
+
+const ACTIVITY_EMOJI = {
+  '텀블러 사용하기': '🧋',
+  '쓰레기 줍기': '🗑️',
+  '분리수거 실천하기': '♻️',
+  '플로깅 챌린지': '🏃',
+  '해안 정화 활동': '🌊',
+};
+
+function timeAgo(isoString) {
+  if (!isoString) return '';
+  const diff = Date.now() - new Date(isoString).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return '방금 전';
+  if (min < 60) return `${min}분 전`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}시간 전`;
+  return `${Math.floor(hr / 24)}일 전`;
+}
 
 /* ─── 스타일 ─── */
 const Page = styled.div`
@@ -183,116 +196,28 @@ const LikeBtn = styled.button`
   font-family: var(--font);
 `;
 
-const ApproveBtn = styled.button`
-  background: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: 20px;
-  padding: 6px 16px;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-  flex-shrink: 0;
-  margin-top: 4px;
-`;
-
-const DetailOverlay = styled.div`
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-`;
-
-const DetailModal = styled.div`
-  width: 100%;
-  max-width: 360px;
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  padding: 18px;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
-  max-height: 90vh;
-  overflow-y: auto;
-`;
-
-const DetailImage = styled.img`
-  width: 100%;
-  border-radius: 12px;
-  height: auto;
-  object-fit: cover;
-  display: block;
-  margin-bottom: 12px;
-`;
-
-const DetailClose = styled.button`
-  background: none;
-  border: none;
-  color: var(--color-text-secondary);
-  font-weight: 800;
-  padding: 4px 8px;
-  cursor: pointer;
-  float: right;
-`;
-
-const DetailText = styled.p`
-  font-size: 13px;
-  color: var(--color-text);
-  margin-top: 10px;
-`;
-
-const FeedPhoto = styled.img`
-  width: 56px;
-  height: 56px;
-  border-radius: 10px;
-  object-fit: cover;
-  flex-shrink: 0;
-`;
 
 export default function Home() {
   const navigate = useNavigate();
+  const [user, setUser] = useState({ name: localStorage.getItem('user_name') || '', points: 0, streak: 0 });
+  const [feed, setFeed] = useState([]);
   const [likedIds, setLikedIds] = useState([]);
-  const [records, setRecords] = useState([]);
-  const [user, setUser] = useState(MOCK_USER);
-  const [selectedRecord, setSelectedRecord] = useState(null);
-
-  // 사용자 정보 localStorage에 저장 및 불러오기
-  useEffect(() => {
-    localStorage.setItem('user', JSON.stringify(MOCK_USER));
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) setUser(JSON.parse(savedUser));
-  }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem('records');
-    if (saved) setRecords(JSON.parse(saved));
-  }, []);
+    const userId = localStorage.getItem('user_id') || '1';
+    fetch(`${API}/users/me?user_id=${userId}`)
+      .then(r => r.json())
+      .then(data => setUser({ ...data, name: data.name || localStorage.getItem('user_name') || '' }))
+      .catch(err => console.error('유저 조회 실패:', err));
 
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const saved = localStorage.getItem('records');
-      if (saved) setRecords(JSON.parse(saved));
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    fetch(`${API}/feed`)
+      .then(r => r.json())
+      .then(setFeed)
+      .catch(err => console.error('피드 조회 실패:', err));
   }, []);
 
   const toggleLike = (id) =>
     setLikedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-
-  const approveRecord = (recordId) => {
-    const updated = records.map(r => 
-      r.id === recordId ? {...r, status: 'approved', point: 50} : r
-    );
-    setRecords(updated);
-    localStorage.setItem('records', JSON.stringify(updated));
-  };
-
-  // 승인된 기록만 포인트 계산
-  const approvedRecords = records.filter(r => r.status === 'approved');
-  const totalPoints = approvedRecords.reduce((sum, r) => sum + r.point, 0);
 
   return (
     <Page>
@@ -302,24 +227,24 @@ export default function Home() {
           <h1>안녕하세요, {user.name}님 👋</h1>
           <p>오늘도 지구를 지켜봐요!</p>
         </Greeting>
-        <PointBadge>🌱 {totalPoints.toLocaleString()}P</PointBadge>
+        <PointBadge>🌱 {(user.points || 0).toLocaleString()}P</PointBadge>
       </TopBar>
 
       {/* 활동 배너 */}
       <BannerCard style={{ margin: '20px 20px 0' }}>
         <BannerTitle>이번 주 활동 스트릭</BannerTitle>
-        <BannerStat>{MOCK_USER.streak}일 🔥</BannerStat>
+        <BannerStat>{user.streak || 0}일 🔥</BannerStat>
         <BannerSub>연속으로 환경 보호에 참여 중이에요!</BannerSub>
         <StreakRow>
           {Array.from({ length: 7 }, (_, i) => (
-            <StreakDot key={i} filled={i < MOCK_USER.streak} />
+            <StreakDot key={i} filled={i < (user.streak || 0)} />
           ))}
         </StreakRow>
       </BannerCard>
 
       {/* 인증하기 버튼 */}
       <Section>
-        <CertifyBtn onClick={() => alert('카메라 기능은 백엔드 연동 후 구현 예정!')}>
+        <CertifyBtn onClick={() => navigate('/matching')}>
           📸 지금 바로 인증하기
         </CertifyBtn>
       </Section>
@@ -331,69 +256,28 @@ export default function Home() {
           <button onClick={() => navigate('/records')}>전체보기</button>
         </SectionHeader>
 
-        {records.length === 0 ? (
-  <p>아직 활동이 없어요 😢</p>
-) : (
-  records.map(item => (
-    <FeedCard key={item.id} onClick={() => setSelectedRecord(item)} style={{ cursor: 'pointer' }}>
-      <EmojiCircle>{item.emoji}</EmojiCircle>
-      <FeedInfo>
-        <div className="name">{item.user || user.name}</div>
-        <div className="act">{item.activity}</div>
-        <div className="meta">
-          📍 {item.location} • {item.status === 'pending' ? '검토 중 ⏳' : '인증 완료 ✅'}
-        </div>
-      </FeedInfo>
-      {item.status === 'pending' ? (
-        <ApproveBtn
-          onClick={e => {
-            e.stopPropagation();
-            approveRecord(item.id);
-          }}
-        >
-          승인
-        </ApproveBtn>
-      ) : (
-        <LikeBtn
-          onClick={e => {
-            e.stopPropagation();
-            toggleLike(item.id);
-          }}
-        >
-          <span style={{ fontSize: 20 }}>
-            {likedIds.includes(item.id) ? '💚' : '🤍'}
-          </span>
-        </LikeBtn>
-      )}
-    </FeedCard>
-  ))
-)}
+        {feed.length === 0 ? (
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: 14, textAlign: 'center', padding: '24px 0' }}>
+            아직 활동이 없어요 😢
+          </p>
+        ) : (
+          feed.map(item => (
+            <FeedCard key={item.id}>
+              <EmojiCircle>{ACTIVITY_EMOJI[item.mission_name] || '✅'}</EmojiCircle>
+              <FeedInfo>
+                <div className="name">{item.user_name}</div>
+                <div className="act">{item.mission_name}</div>
+                <div className="meta">✅ 인증 완료 • {timeAgo(item.created_at)}</div>
+              </FeedInfo>
+              <LikeBtn onClick={() => toggleLike(item.id)}>
+                <span style={{ fontSize: 20 }}>
+                  {likedIds.includes(item.id) ? '💚' : '🤍'}
+                </span>
+              </LikeBtn>
+            </FeedCard>
+          ))
+        )}
       </Section>
-
-      {selectedRecord && (
-        <DetailOverlay onClick={() => setSelectedRecord(null)}>
-          <DetailModal onClick={e => e.stopPropagation()}>
-            <DetailClose onClick={() => setSelectedRecord(null)}>✕ 닫기</DetailClose>
-            <div style={{ marginBottom: 8, color: 'var(--color-text-secondary)', fontSize: 12 }}>
-              {selectedRecord.status === 'pending' ? '검토 중' : '인증 완료'} • {selectedRecord.date || ''}
-            </div>
-            {selectedRecord.photo ? (
-              <DetailImage src={selectedRecord.photo} alt="활동 인증 사진" />
-            ) : (
-              <div style={{
-                width: '100%', height: 180, borderRadius: 12, background: '#F0F0EC', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8F8F87'
-              }}>
-                사진 없음
-              </div>
-            )}
-            <DetailText>활동: {selectedRecord.activity}</DetailText>
-            <DetailText>위치: {selectedRecord.location}</DetailText>
-            {selectedRecord.description && (
-              <DetailText>설명: {selectedRecord.description}</DetailText>
-            )}
-          </DetailModal>
-        </DetailOverlay>
-      )}
     </Page>
   );
 }

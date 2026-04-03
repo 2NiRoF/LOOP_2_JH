@@ -29,8 +29,8 @@ const globalStyles = css`
     --color-accent-light: #FFB300;
     --color-bg: #F9FBF7;
     --color-surface: #FFFFFF;
-    --color-text: #1B2A1C;
-    --color-text-secondary: #5A7260;
+    --color-text: #000000;
+    --color-text-secondary: #000000;
     --color-border: #D8EBD9;
     --radius-sm: 12px;
     --radius-md: 20px;

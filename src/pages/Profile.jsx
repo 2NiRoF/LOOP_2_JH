@@ -85,8 +85,8 @@ export default function Profile() {
         return;
       }
 
-      localStorage.setItem("user_id", user_id);
-      navigate("/home");
+      localStorage.setItem("user_id", String(user_id));
+      navigate("/");
 
     } catch (err) {
       console.error("에러:", err);
@@ -122,15 +122,15 @@ export default function Profile() {
 
         <div className="screen-body" style={{ paddingTop: 28 }}>
 
-          {/* STEP 1: 이름 */}
+          {/* STEP 1: 닉네임 */}
           {step === 1 && (
               <div className="profile-step">
                 <div className="step-header">
-                  <div className="step-title">이름이 무엇인가요?</div>
+                  <div className="step-title">닉네임이 무엇인가요?</div>
                 </div>
                 <input
                     className="input-field"
-                    placeholder="이름을 입력해 주세요"
+                    placeholder="닉네임을 입력해 주세요"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     autoFocus

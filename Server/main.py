@@ -1,6 +1,7 @@
 import json
 import uvicorn
 from contextlib import asynccontextmanager
+from datetime import datetime
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -55,14 +56,26 @@ class UserResponse(BaseModel):
     name: str
     profile_image: str
     points: int
+    streak: int
+    level: int
+    email: Optional[str] = None
+    join_date: Optional[datetime] = None
     birth: Optional[str] = None
     gender: Optional[str] = None
     interests: Optional[List[str]] = None
     class Config: from_attributes = True
 
+class FeedItemResponse(BaseModel):
+    id: int
+    user_name: str
+    mission_name: str
+    created_at: Optional[str] = None
+
 class RecordResponse(BaseModel):
     id: int
-    content: str
+    mission_name: str
+    proof_content: str
+    created_at: Optional[datetime] = None
     class Config: from_attributes = True
 
 class ActivityResponse(BaseModel):
@@ -116,7 +129,9 @@ def root():
 # [GET] 내 프로필 조회
 @app.get("/users/me", response_model=UserResponse, tags=["Users"])
 def read_user_me(current_user: models.User = Depends(get_current_user)):
-    return current_user
+    data = {c.name: getattr(current_user, c.name) for c in current_user.__table__.columns}
+    data["interests"] = json.loads(current_user.interests) if current_user.interests else None
+    return data
 
 # [PUT] 프로필 수정
 @app.put("/users/me", tags=["Users"])
@@ -168,10 +183,30 @@ def add_points(amount: int = 10, db: Session = Depends(get_db), current_user: mo
     db.refresh(current_user)
     return {"message": f"{amount} 포인트 획득!", "total_points": current_user.points}
 
-# [GET] 활동 목록 조회 — 프론트 MOCK_CHALLENGES 대체
+# [GET] 활동 목록 조회
 @app.get("/activities", response_model=List[ActivityResponse], tags=["Activities"])
 def get_activities(db: Session = Depends(get_db)):
     return db.query(models.Activity).all()
+
+
+# [GET] 전체 유저 활동 피드 (최근 20건)
+@app.get("/feed", response_model=List[FeedItemResponse], tags=["Feed"])
+def get_feed(db: Session = Depends(get_db)):
+    records = (
+        db.query(models.Record)
+        .order_by(models.Record.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "user_name": r.user.name if r.user else "알 수 없음",
+            "mission_name": r.mission_name,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in records
+    ]
 
 
 # [POST] 매칭 참여 — 빈 방 있으면 입장, 없으면 방 생성
@@ -316,31 +351,46 @@ def reject_partner_proof(room_id: int, target_user_id: int, db: Session = Depend
 # [POST] 특정 멤버의 인증 승인 및 방 종료 처리
 @app.post("/rooms/{room_id}/approve", tags=["Proof"])
 def approve_partner_proof(room_id: int, target_user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # ... (1. 기본 검증 및 2. 승인 처리 로직은 동일) ...
+    # 1. 기본 검증
+    if target_user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="자신의 인증은 승인할 수 없습니다.")
+    proof = db.query(models.Proof).filter_by(room_id=room_id, user_id=target_user_id).first()
+    if not proof:
+        raise HTTPException(status_code=404, detail="승인할 인증 내역이 없습니다.")
+    if proof.status != "pending":
+        raise HTTPException(status_code=400, detail=f"현재 상태({proof.status})에서는 승인할 수 없습니다.")
+
+    # 2. 승인 처리
+    proof.status = "approved"
+    db.flush()
 
     # 3. 방 종료 및 레코드 개별 저장
     room = db.query(models.Room).filter_by(id=room_id).first()
     activity = db.query(models.Activity).filter_by(id=room.activity_id).first()
-    
+
     member_ids = [m.user_id for m in room.members]
     all_proofs = db.query(models.Proof).filter_by(room_id=room_id).all()
     approved_proofs = [p for p in all_proofs if p.status == "approved"]
 
     if len(member_ids) == len(approved_proofs):
-        # ── 각 멤버별로 순회하며 레코드 생성 ──
         for p in all_proofs:
-            new_record = models.Record(
+            db.add(models.Record(
                 user_id=p.user_id,
-                mission_name=activity.name,      # ✨ 미션명 따로
-                proof_content=p.description      # ✨ 인증내용 따로
-            )
-            db.add(new_record)
-        
-        # 4. 방 데이터 삭제
+                mission_name=activity.name,
+                proof_content=p.description,
+            ))
+
+        # 4. 참여자 전원에게 100포인트 지급
+        for uid in member_ids:
+            user = db.query(models.User).filter_by(id=uid).first()
+            if user:
+                user.points += 100
+
+        # 5. 방 데이터 삭제
         db.query(models.Proof).filter_by(room_id=room_id).delete()
         db.query(models.RoomMember).filter_by(room_id=room_id).delete()
         db.delete(room)
-        
+
         db.commit()
         return {"message": "기록이 분리되어 저장되었습니다.", "room_closed": True}
 

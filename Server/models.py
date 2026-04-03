@@ -40,6 +40,8 @@ class User(Base):
     # 가입일 (서버 시간 자동 기록)
     join_date = Column(DateTime(timezone=True), server_default=func.now())
 
+    records = relationship("Record", back_populates="user")
+
 class Record(Base):
     __tablename__ = "records"
 

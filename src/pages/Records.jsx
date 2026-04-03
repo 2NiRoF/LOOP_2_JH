@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
 
-/* ─── 임시 데이터 ─── */
-const MOCK_RECORDS = [
-  { id: 1, activity: '쓰레기 줍기', location: '한강공원',  date: '2025-03-28', point: 50,  status: 'approved', emoji: '🗑️' },
-  { id: 2, activity: '분리수거',    location: '마포구 자택', date: '2025-03-27', point: 30,  status: 'approved', emoji: '♻️' },
-  { id: 3, activity: '플로깅',      location: '북한산',      date: '2025-03-25', point: 80,  status: 'pending',  emoji: '🏃' },
-  { id: 4, activity: '해안 정화',   location: '인천 을왕리', date: '2025-03-22', point: 120, status: 'approved', emoji: '🌊' },
-  { id: 5, activity: '쓰레기 줍기', location: '홍대입구역',  date: '2025-03-20', point: 50,  status: 'rejected', emoji: '🗑️' },
-];
+const API = 'http://127.0.0.1:8000';
+
+const ACTIVITY_EMOJI = {
+  '텀블러 사용하기': '🧋',
+  '쓰레기 줍기': '🗑️',
+  '분리수거 실천하기': '♻️',
+  '플로깅 챌린지': '🏃',
+  '해안 정화 활동': '🌊',
+};
 
 const STATUS_MAP = {
   approved: { label: '인증 완료', color: '#03C75A', bg: '#E8F5E9' },
@@ -167,20 +168,23 @@ export default function Records() {
   const [records, setRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
-  // 2️⃣ 페이지가 마운트될 때 localStorage에서 불러오기
   useEffect(() => {
-    const saved = localStorage.getItem('records');
-    if (saved) setRecords(JSON.parse(saved));
-  }, []);
-
-  // 3️⃣ localStorage 변화를 감지해서 상태 업데이트
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const saved = localStorage.getItem('records');
-      if (saved) setRecords(JSON.parse(saved));
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    const userId = localStorage.getItem('user_id') || '1';
+    fetch(`${API}/users/me/records?user_id=${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        const mapped = data.map(r => ({
+          id: r.id,
+          activity: r.mission_name,
+          date: r.created_at ? r.created_at.slice(0, 10) : '',
+          point: 100,
+          status: 'approved',
+          emoji: ACTIVITY_EMOJI[r.mission_name] || '✅',
+          description: r.proof_content,
+        }));
+        setRecords(mapped);
+      })
+      .catch(err => console.error('활동 기록 조회 실패:', err));
   }, []);
 
   const approved = records.filter(r => r.status === 'approved');
@@ -224,7 +228,6 @@ export default function Records() {
               <EmojiCircle>{record.emoji}</EmojiCircle>
               <RecordInfo>
                 <div className="act">{record.activity}</div>
-                <div className="meta">📍 {record.location}</div>
                 <div className="meta">📅 {record.date}</div>
                 {record.description && <div className="meta">📝 {record.description}</div>}
               </RecordInfo>
@@ -256,7 +259,7 @@ export default function Records() {
               </div>
             )}
             <DetailText>활동: {selectedRecord.activity}</DetailText>
-            <DetailText>위치: {selectedRecord.location}</DetailText>
+            <DetailText>날짜: {selectedRecord.date}</DetailText>
             {selectedRecord.description && (
               <DetailText>설명: {selectedRecord.description}</DetailText>
             )}
