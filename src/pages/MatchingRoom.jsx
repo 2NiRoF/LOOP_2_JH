@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Authorize from './Authorize';
 import styled from '@emotion/styled';
 import { keyframes } from '@emotion/react';
+
+const API = 'http://127.0.0.1:8000';
+const AVATARS = ['🐻‍❄️', '🐱', '🐶', '🦊', '🐸', '🦁', '🐨', '🐯'];
 
 /* ─── 애니메이션 ─── */
 const fadeSlideUp = keyframes`
@@ -16,20 +19,12 @@ const slideInCard = keyframes`
 
 /* ─── 상태 설정 ─── */
 const STATUS = {
-    waiting:   { label: '진행 중',   color: '#5A7260', bg: '#F0F4F0', dot: '#9E9E9E' },
+    waiting:   { label: '진행 중',    color: '#5A7260', bg: '#F0F4F0', dot: '#9E9E9E' },
     started:   { label: '실천 시작!', color: '#E65100', bg: '#FFF3E0', dot: '#FF8F00' },
-
     pending:   { label: '인증 검토중', color: '#1565C0', bg: '#E3F2FD', dot: '#42A5F5' },
-
     completed: { label: '실천 완료!', color: '#2E7D32', bg: '#E8F5E9', dot: '#4CAF50' },
+    rejected:  { label: '인증 반려',  color: '#B71C1C', bg: '#FFEBEE', dot: '#EF9A9A' },
 };
-
-/* ─── 임시 참여자 데이터 ─── */
-const MOCK_MEMBERS = [
-    { id: 1, name: '부지런한 북극곰', avatar: '🐻‍❄️', status: 'waiting',   time: '오후 2:14' },
-    { id: 2, name: '나',             avatar: '🙋',    status: 'waiting',   time: '오후 2:14', isMe: true },
-    { id: 3, name: '올찬 고양이',    avatar: '🐱',    status: 'completed', time: '오후 2:31' },
-];
 
 /* ─── 스타일 ─── */
 const Page = styled.div`
@@ -164,7 +159,7 @@ const StatusBox = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: ${p => STATUS[p.status].bg};
+  background: ${p => STATUS[p.status]?.bg || STATUS.waiting.bg};
   border-radius: var(--radius-sm);
   padding: 9px 13px;
 `;
@@ -179,21 +174,45 @@ const StatusDot = styled.div`
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: ${p => STATUS[p.status].dot};
+  background: ${p => STATUS[p.status]?.dot || STATUS.waiting.dot};
   flex-shrink: 0;
 `;
 
 const StatusLabel = styled.span`
   font-size: 14px;
   font-weight: 800;
-  color: ${p => STATUS[p.status].color};
+  color: ${p => STATUS[p.status]?.color || STATUS.waiting.color};
 `;
 
-const TimeLabel = styled.span`
-  font-size: 11px;
-  font-weight: 600;
-  color: ${p => STATUS[p.status].color};
-  opacity: 0.7;
+const ActionBtnRow = styled.div`
+  display: flex;
+  gap: 6px;
+`;
+
+const ApproveBtn = styled.button`
+  background: #E8F5E9;
+  border: 1px solid #A5D6A7;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 800;
+  color: #2E7D32;
+  cursor: pointer;
+  &:active { background: #C8E6C9; }
+`;
+
+const RejectBtn = styled.button`
+  background: #FFEBEE;
+  border: 1px solid #FFCDD2;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 800;
+  color: #B71C1C;
+  cursor: pointer;
+  &:active { background: #FFCDD2; }
 `;
 
 /* ─── 하단 인증 툴바 ─── */
@@ -206,26 +225,22 @@ const Toolbar = styled.div`
 
 const CertifyBtn = styled.button`
   width: 100%;
-  background: var(--color-primary);
-  color: white;
+  background: ${p => p.disabled ? 'var(--color-border)' : 'var(--color-primary)'};
+  color: ${p => p.disabled ? 'var(--color-text-secondary)' : 'white'};
   border: none;
   border-radius: var(--radius-md);
   padding: 17px;
   font-family: var(--font);
   font-size: 16px;
   font-weight: 800;
-  cursor: pointer;
+  cursor: ${p => p.disabled ? 'default' : 'pointer'};
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 4px 16px rgba(46,125,50,0.3);
+  box-shadow: ${p => p.disabled ? 'none' : '0 4px 16px rgba(46,125,50,0.3)'};
   transition: transform 0.15s, box-shadow 0.15s;
-
-  &:active {
-    transform: scale(0.98);
-    box-shadow: 0 2px 8px rgba(46,125,50,0.2);
-  }
+  &:active { transform: ${p => p.disabled ? 'none' : 'scale(0.98)'}; }
 `;
 
 /* ─── 경고 모달 ─── */
@@ -279,84 +294,150 @@ const ModalBtn = styled.button`
   &:active { opacity: 0.8; }
 `;
 
+/* ─── 완료 화면 ─── */
+const CompletionArea = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  animation: ${fadeSlideUp} 0.4s ease both;
+`;
+
 /* ─── 컴포넌트 ─── */
-export default function MatchingRoom({ activity, onBack, onEnd, onConfirm }) {
-    const [members, setMembers] = useState(MOCK_MEMBERS);
-    const [showConfirm, setShowConfirm] = useState(false);
+export default function MatchingRoom({ activity, onBack, onEnd }) {
+    const [members, setMembers]           = useState([]);
+    const [showConfirm, setShowConfirm]   = useState(false);
     const [showAuthorize, setShowAuthorize] = useState(false);
-    const [successText, setSuccessText] = useState('');
+    const [successText, setSuccessText]   = useState('');
+    const [roomClosed, setRoomClosed]     = useState(false);
+    const pollingRef = useRef(null);
 
-    const approveRecord = (id) => {
-    const records = JSON.parse(localStorage.getItem('records')) || [];
+    const userId = Number(localStorage.getItem('user_id') || '1');
+    const roomId = activity?.room_id;
 
-    const updated = records.map(r =>
-    r.id === id ? { ...r, status: 'completed' } : r
-    );
+    const fetchRoomData = async () => {
+        try {
+            const [roomRes, proofsRes] = await Promise.all([
+                fetch(`${API}/rooms/${roomId}`),
+                fetch(`${API}/rooms/${roomId}/proofs`),
+            ]);
 
-  localStorage.setItem('records', JSON.stringify(updated));
+            // 방이 사라진 경우 (모든 인증 완료로 자동 종료)
+            if (roomRes.status === 404) {
+                clearInterval(pollingRef.current);
+                setRoomClosed(true);
+                setTimeout(() => onEnd(), 2500);
+                return;
+            }
 
-  window.dispatchEvent(new Event('storage'));
-};
+            const room   = await roomRes.json();
+            const proofs = await proofsRes.json();
 
-    const handleCertify = () => {
-        // 내 상태를 '실천 시작!'으로 변경 (추후 이미지 업로드 연동)
-        setMembers(prev =>
-            prev.map(m =>
-                m.isMe
-                    ? { ...m, status: m.status === 'waiting' ? 'started' : 'completed', time: '오후 2:35' }
-                    : m
-            )
-        );
-        alert('📸 이미지 업로드는 백엔드 연동 후 구현 예정이에요!');
+            // proof 상태를 user_id로 빠르게 조회
+            const proofMap = {};
+            proofs.forEach(p => { proofMap[p.user_id] = p; });
+
+            const mapped = room.members.map((m, i) => {
+                const proof = proofMap[m.user_id];
+                let status = 'waiting';
+                if (proof) {
+                    if (proof.status === 'pending')  status = 'pending';
+                    else if (proof.status === 'approved') status = 'completed';
+                    else if (proof.status === 'rejected') status = 'started';
+                }
+                return {
+                    id:      m.id,
+                    user_id: m.user_id,
+                    name:    m.name,
+                    avatar:  AVATARS[i % AVATARS.length],
+                    status,
+                    isMe:    m.user_id === userId,
+                    hasPendingProof: proof?.status === 'pending',
+                };
+            });
+
+            setMembers(mapped);
+        } catch (err) {
+            console.error('방 정보 조회 실패:', err);
+        }
     };
 
-    const myStatus = members.find(m => m.isMe)?.status;
+    useEffect(() => {
+        if (!roomId) return;
+        fetchRoomData();
+        pollingRef.current = setInterval(fetchRoomData, 2000);
+        return () => clearInterval(pollingRef.current);
+    }, [roomId]);
+
+    const handleApprove = async (targetUserId) => {
+        try {
+            await fetch(
+                `${API}/rooms/${roomId}/approve?target_user_id=${targetUserId}&user_id=${userId}`,
+                { method: 'POST' }
+            );
+            fetchRoomData();
+        } catch (err) {
+            console.error('승인 실패:', err);
+        }
+    };
+
+    const handleReject = async (targetUserId) => {
+        try {
+            await fetch(
+                `${API}/rooms/${roomId}/reject?target_user_id=${targetUserId}&user_id=${userId}`,
+                { method: 'POST' }
+            );
+            fetchRoomData();
+        } catch (err) {
+            console.error('반려 실패:', err);
+        }
+    };
+
+    const handleLeave = async () => {
+        clearInterval(pollingRef.current);
+        try {
+            await fetch(`${API}/matching/cancel?user_id=${userId}`, { method: 'DELETE' });
+        } catch {}
+        onEnd();
+    };
+
+    const myMember       = members.find(m => m.isMe);
+    const myStatus       = myMember?.status || 'waiting';
     const completedCount = members.filter(m => m.status === 'completed').length;
+    const certifyDisabled = myStatus === 'pending' || myStatus === 'completed';
 
-    // ✅ 방 전체 완료 여부
-    const allCompleted = members.every(m => m.status === 'completed');
+    let certifyText = '📸 사진 인증';
+    if (myStatus === 'completed') certifyText = '✅ 실천 완료!';
+    else if (myStatus === 'pending') certifyText = '⏳ 인증 검토 중';
+    else if (myStatus === 'started') certifyText = '📸 인증 재제출';
 
-    // ✅ 버튼 텍스트를 명확하게 분리
-    let certifyText = '📸 내 실천 인증하기';
-
-    if (myStatus === 'completed') {
-      certifyText = '✅ 실천 완료!';
-  } else if (myStatus === 'pending') {
-    certifyText = '⏳ 인증 검토 중';
-  } else if (!allCompleted) {
-    certifyText = '📸 사진 인증';
-  }
+    // 모든 인증 완료 화면
+    if (roomClosed) {
+        return (
+            <Page>
+                <CompletionArea>
+                    <div style={{ fontSize: 56 }}>🎉</div>
+                    <p style={{ fontSize: 20, fontWeight: 800 }}>모든 인증이 완료됐어요!</p>
+                    <p style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>100포인트가 적립되었습니다</p>
+                </CompletionArea>
+            </Page>
+        );
+    }
 
     // 인증 페이지
     if (showAuthorize) {
         return (
             <Authorize
+                roomId={roomId}
+                userId={userId}
                 onBack={() => setShowAuthorize(false)}
-                onSubmit={(photo, description) => {
-    setMembers(prev => {
-        const updatedMembers = prev.map(m =>
-            m.isMe
-                ? { ...m, status: 'pending', time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) }
-                : m
-        );
-
-        // 방 전체 완료 체크 후 roomStatus 결정
-        const allDone = updatedMembers.every(m => m.status === 'completed');
-        if (allDone) {
-            console.log('모든 멤버 완료! 방 상태를 completed로 변경 가능');
-        }
-
-        return updatedMembers;
-    });
-
-    onConfirm?.(photo, description);
-
-    setSuccessText('⏳ 인증 검토 중입니다');
-    setTimeout(() => {
-        setShowAuthorize(false);
-        setSuccessText('');
-    }, 2000);
-}}
+                onSubmit={() => {
+                    setShowAuthorize(false);
+                    setSuccessText('⏳ 인증 검토 중입니다');
+                    setTimeout(() => setSuccessText(''), 2500);
+                }}
             />
         );
     }
@@ -389,7 +470,7 @@ export default function MatchingRoom({ activity, onBack, onEnd, onConfirm }) {
                         fontSize: 13,
                         fontWeight: 700,
                         padding: '8px 12px',
-                        display: 'inline-block'
+                        display: 'inline-block',
                     }}>
                         {successText}
                     </div>
@@ -410,10 +491,16 @@ export default function MatchingRoom({ activity, onBack, onEnd, onConfirm }) {
                                 <StatusLeft>
                                     <StatusDot status={member.status} />
                                     <StatusLabel status={member.status}>
-                                        {STATUS[member.status].label}
+                                        {STATUS[member.status]?.label}
                                     </StatusLabel>
                                 </StatusLeft>
-                                <TimeLabel status={member.status}>{member.time}</TimeLabel>
+                                {/* 다른 멤버의 인증이 검토중일 때 승인/반려 버튼 표시 */}
+                                {!member.isMe && member.hasPendingProof && (
+                                    <ActionBtnRow>
+                                        <ApproveBtn onClick={() => handleApprove(member.user_id)}>승인</ApproveBtn>
+                                        <RejectBtn  onClick={() => handleReject(member.user_id)}>반려</RejectBtn>
+                                    </ActionBtnRow>
+                                )}
                             </StatusBox>
                         </CardInfo>
                     </MemberCard>
@@ -422,28 +509,30 @@ export default function MatchingRoom({ activity, onBack, onEnd, onConfirm }) {
 
             {/* ── 하단 인증 툴바 ── */}
             <Toolbar>
-                <CertifyBtn onClick={() => setShowAuthorize(true)}>
-    {certifyText}
-</CertifyBtn>
+                <CertifyBtn
+                    disabled={certifyDisabled}
+                    onClick={() => !certifyDisabled && setShowAuthorize(true)}
+                >
+                    {certifyText}
+                </CertifyBtn>
             </Toolbar>
 
             {/* ── 활동 종료 확인 모달 ── */}
             {showConfirm && (
                 <Overlay>
                     <Modal>
-                        <ModalTitle>{'정말로 활동을 종료하겠습니까?'}
-                            </ModalTitle>
-                            <ModalBtnRow>
-                            <ModalBtn onClick={() => { setShowConfirm(false); onEnd(); }}>
-                            네
+                        <ModalTitle>정말로 활동을 종료하겠습니까?</ModalTitle>
+                        <ModalBtnRow>
+                            <ModalBtn onClick={() => { setShowConfirm(false); handleLeave(); }}>
+                                네
                             </ModalBtn>
                             <ModalBtn confirm onClick={() => setShowConfirm(false)}>
-                            아니오
-                        </ModalBtn>
-                    </ModalBtnRow>
-                </Modal>
+                                아니오
+                            </ModalBtn>
+                        </ModalBtnRow>
+                    </Modal>
                 </Overlay>
-                )}
+            )}
         </Page>
     );
 }

@@ -300,7 +300,9 @@ const CompletionText = styled.p`
 `;
 
 /* ─── 컴포넌트 ─── */
-export default function Authorize({ onBack, onSubmit }) {
+const API = 'http://127.0.0.1:8000';
+
+export default function Authorize({ roomId, userId, onBack, onSubmit }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [description, setDescription] = useState('');
@@ -347,25 +349,41 @@ export default function Authorize({ onBack, onSubmit }) {
 
   const openGallery = () => fileInputRef.current?.click();
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedImage) {
       alert('인증할 사진을 선택해주세요.');
       return;
     }
-    // TODO: API 연동 — FormData로 이미지 업로드
+    try {
+      const res = await fetch(
+        `${API}/rooms/${roomId}/proof?user_id=${userId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image_url: selectedImage,
+            description: description.trim(),
+          }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.detail || '인증 제출에 실패했습니다.');
+        return;
+      }
+    } catch (err) {
+      console.error('인증 제출 실패:', err);
+      alert('서버에 연결할 수 없습니다.');
+      return;
+    }
+
     setSubmitted(true);
     setDone(true);
-    
-    // 3초 후 fadeOut 시작
-    setTimeout(() => {
-      setRemoving(true);
-    }, 3000);
-    
-    // 3.4초 후 오버레이 제거 및 콜백 호출
+    setTimeout(() => setRemoving(true), 3000);
     setTimeout(() => {
       setDone(false);
       setRemoving(false);
-      onSubmit?.(selectedImage, description.trim());
+      onSubmit?.();
     }, 3400);
   };
 
